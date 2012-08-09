@@ -155,7 +155,7 @@ static const int kAlignmentBuffer = 5;
         {
             NSString *word = [stringsArray objectAtIndex:i];
             
-            if ([[line stringByAppendingFormat:@"%@ ", word] sizeWithFont:self.font].width <= self.frame.size.width) 
+            if ([[line stringByAppendingFormat:@"%@", word] sizeWithFont:self.font].width <= self.frame.size.width) 
             {
                 line = [line stringByAppendingFormat:@"%@ ", word];
                 [wordsToRemove addIndex:i];
