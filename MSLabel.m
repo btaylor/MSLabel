@@ -17,6 +17,10 @@ static const int kAlignmentBuffer = 5;
 
 - (void)setup;
 - (NSArray *)stringsFromText:(NSString *)string;
+- (NSString *)stringByTruncatingString:(NSString *)string toWidth:(CGFloat)width withFont:(UIFont*)font;
+- (NSMutableArray *)stringsWithWordsWrappedFromArray:(NSArray *)strings;
+- (NSMutableArray *)arrayOfCharactersInString:(NSString *)string;
+- (NSString *)lastWordInString:(NSString *)string;
 
 @end
 
@@ -160,7 +164,7 @@ static const int kAlignmentBuffer = 5;
         {
             NSString *character = [characterArray objectAtIndex:i];
             
-            if ([[line stringByAppendingFormat:@"%@", character] sizeWithFont:self.font].width <= self.frame.size.width)
+            if ([[line stringByAppendingFormat:@"%@", character] sizeWithFont:self.font].width <= (self.frame.size.width - 10))
             {
                 line = [line stringByAppendingFormat:@"%@", character];
                 [charsToRemove addIndex:i];
@@ -180,55 +184,81 @@ static const int kAlignmentBuffer = 5;
         [characterArray removeObjectsAtIndexes:charsToRemove];
     }
     
-    if (slicedString.count > self.numberOfLines && self.numberOfLines != 0)
-    {
-        NSString *line = [slicedString objectAtIndex:(self.numberOfLines - 1)];
-        line = [line stringByReplacingCharactersInRange:NSMakeRange(line.length - 3, 3) withString:@"..."];
-        [slicedString removeObjectAtIndex:(self.numberOfLines - 1)];
-        [slicedString insertObject:line atIndex:(self.numberOfLines - 1)];
-    }
-    
-    slicedString = [self stringsWithWordsInTactFromArray:slicedString];
+    slicedString = [self stringsWithWordsWrappedFromArray:slicedString];
     
     return slicedString;
 }
 
-- (NSMutableArray *)stringsWithWordsInTactFromArray:(NSArray *)strings
+- (NSMutableArray *)stringsWithWordsWrappedFromArray:(NSArray *)strings
 {
-    NSString *lastWord;
     NSMutableArray *newStrings = [NSMutableArray arrayWithArray:strings];
     
     for (int i = 0; i < strings.count; i++)
     {
         if(i != 0)
         {
-            // Check for whole words
-            NSArray *wordArray = [[strings objectAtIndex:i - 1] componentsSeparatedByString:@" "];
+            NSString *lastWord = [self lastWordInString:[strings objectAtIndex:i - 1]];
             
-            if(wordArray.count > 1)
-            {
-                lastWord = [wordArray lastObject];
-            }
-            else
-            {
-                lastWord = @"";
-            }
-            
-            if(lastWord.length > 0);
+            // Fix word wrapping
+            if(lastWord.length > 0)
             {
                 NSString *lastString = [newStrings objectAtIndex:i - 1];
                 NSString *updatedString = [lastString substringToIndex:lastString.length - (lastWord.length + 1)];
                 [newStrings replaceObjectAtIndex:i-1 withObject:updatedString];
                 
                 NSString *currentString = [newStrings objectAtIndex:i];
+                
                 currentString = [NSString stringWithFormat:@"%@%@",lastWord,currentString];
                 
                 [newStrings replaceObjectAtIndex:i withObject:currentString];
             }
         }
+        
+    }
+    
+    if (newStrings.count > self.numberOfLines && self.numberOfLines != 0)
+    {
+        NSString *line = [newStrings objectAtIndex:(self.numberOfLines - 1)];
+        line = [line stringByReplacingCharactersInRange:NSMakeRange(line.length - 3, 3) withString:@"..."];
+        [newStrings removeObjectAtIndex:(self.numberOfLines - 1)];
+        [newStrings insertObject:line atIndex:(self.numberOfLines - 1)];
     }
     
     return newStrings;
+}
+
+- (NSString *)lastWordInString:(NSString *)string
+{
+    NSString *lastWord;
+    
+    // Check for whole words
+    NSArray *wordArray = [string componentsSeparatedByString:@" "];
+    
+    if(wordArray.count > 1)
+    {
+        lastWord = [wordArray lastObject];
+    }
+    else
+    {
+        lastWord = @"";
+    }
+    
+    return lastWord;
+}
+
+- (NSString *)stringByTruncatingString:(NSString *)string toWidth:(CGFloat)width withFont:(UIFont*)font
+{
+    NSMutableString *resultString = [[string mutableCopy] autorelease];
+    NSRange range = {resultString.length-1, 1};
+    
+    while ([resultString sizeWithFont:font].width > width) {
+        // delete the last character
+        [resultString deleteCharactersInRange:range];
+        range.location--;
+        // replace the last but one character with an ellipsis
+        //[resultString replaceCharactersInRange:range withString:string];
+    }
+    return resultString;
 }
 
 - (NSMutableArray *)arrayOfCharactersInString:(NSString *)string
