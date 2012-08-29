@@ -17,7 +17,6 @@ static const int kAlignmentBuffer = 5;
 
 - (void)setup;
 - (NSArray *)stringsFromText:(NSString *)string;
-- (NSString *)stringByTruncatingString:(NSString *)string toWidth:(CGFloat)width withFont:(UIFont*)font;
 - (NSMutableArray *)stringsWithWordsWrappedFromArray:(NSArray *)strings;
 - (NSMutableArray *)arrayOfCharactersInString:(NSString *)string;
 - (NSString *)lastWordInString:(NSString *)string;
@@ -244,21 +243,6 @@ static const int kAlignmentBuffer = 5;
     }
     
     return lastWord;
-}
-
-- (NSString *)stringByTruncatingString:(NSString *)string toWidth:(CGFloat)width withFont:(UIFont*)font
-{
-    NSMutableString *resultString = [[string mutableCopy] autorelease];
-    NSRange range = {resultString.length-1, 1};
-    
-    while ([resultString sizeWithFont:font].width > width) {
-        // delete the last character
-        [resultString deleteCharactersInRange:range];
-        range.location--;
-        // replace the last but one character with an ellipsis
-        //[resultString replaceCharactersInRange:range withString:string];
-    }
-    return resultString;
 }
 
 - (NSMutableArray *)arrayOfCharactersInString:(NSString *)string
