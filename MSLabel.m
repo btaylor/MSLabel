@@ -145,7 +145,8 @@ static const int kAlignmentBuffer = 5;
 
 - (void)setup
 {
-    _lineHeight = 10;
+    _lineHeight = 12;
+    self.minimumFontSize = 12;
     _verticalAlignment = MSLabelVerticalAlignmentMiddle;
 }
 
@@ -162,8 +163,22 @@ static const int kAlignmentBuffer = 5;
         for (int i = 0; i < [characterArray count]; i++)
         {
             NSString *character = [characterArray objectAtIndex:i];
+            CGFloat stringWidth = [[line stringByAppendingFormat:@"%@", character] sizeWithFont:self.font].width;
             
-            if ([[line stringByAppendingFormat:@"%@", character] sizeWithFont:self.font].width <= (self.frame.size.width - 10))
+            // shrink font to fit text as best as we can
+            if(stringWidth > (self.frame.size.width - 10))
+            {
+                CGFloat fontSize = self.font.pointSize;
+                
+                while(stringWidth > (self.frame.size.width - 10) && fontSize >= self.minimumFontSize)
+                {
+                    self.font = [UIFont fontWithName:self.font.fontName size:fontSize--];
+                    _lineHeight = self.font.pointSize;
+                    stringWidth = [[line stringByAppendingFormat:@"%@", character] sizeWithFont:self.font].width;
+                }
+            }
+            
+            if (stringWidth <= (self.frame.size.width - 10))
             {
                 line = [line stringByAppendingFormat:@"%@", character];
                 [charsToRemove addIndex:i];
@@ -175,6 +190,7 @@ static const int kAlignmentBuffer = 5;
                     line = [line stringByAppendingFormat:@"%@", character];
                     [charsToRemove addIndex:i];
                 }
+                
                 break;
             }
         }
