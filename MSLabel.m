@@ -8,13 +8,18 @@
 
 #import "MSLabel.h"
 
-// small buffer to allow for characters like g,y etc 
+// small buffer to allow for characters like g,y etc
 static const int kAlignmentBuffer = 5;
 
 @interface MSLabel ()
 
+@property (nonatomic, assign) int drawX;
+
 - (void)setup;
 - (NSArray *)stringsFromText:(NSString *)string;
+- (NSMutableArray *)stringsWithWordsWrappedFromArray:(NSArray *)strings;
+- (NSMutableArray *)arrayOfCharactersInString:(NSString *)string;
+- (NSString *)lastWordInString:(NSString *)string;
 
 @end
 
@@ -22,15 +27,15 @@ static const int kAlignmentBuffer = 5;
 
 @synthesize lineHeight = _lineHeight;
 @synthesize verticalAlignment = _verticalAlignment;
-
+@synthesize drawX = _drawX;
 
 #pragma mark - Initilisation
 
-- (id)initWithFrame:(CGRect)frame 
+- (id)initWithFrame:(CGRect)frame
 {
     self = [super initWithFrame:frame];
     
-    if (self) 
+    if (self)
     {
         [self setup];
     }
@@ -53,7 +58,7 @@ static const int kAlignmentBuffer = 5;
 
 #pragma mark - Drawing
 
-- (void)drawTextInRect:(CGRect)rect 
+- (void)drawTextInRect:(CGRect)rect
 {
     NSArray *slicedStrings = [self stringsFromText:self.text];
     [self.textColor set];
@@ -64,15 +69,15 @@ static const int kAlignmentBuffer = 5;
         numLines = self.numberOfLines;
     }
     
-    int drawY = (self.frame.size.height / 2 - (_lineHeight * numLines) / 2) - kAlignmentBuffer;    
+    int drawY = (self.frame.size.height / 2 - (_lineHeight * numLines) / 2) - kAlignmentBuffer;
     
-    for (int i = 0; i < numLines; i++) 
-    {        
+    for (int i = 0; i < numLines; i++)
+    {
         
         NSString *line = [slicedStrings objectAtIndex:i];
         
         // calculate draw Y based on alignment
-        switch (_verticalAlignment) 
+        switch (_verticalAlignment)
         {
             case MSLabelVerticalAlignmentTop:
             {
@@ -83,7 +88,7 @@ static const int kAlignmentBuffer = 5;
             {
                 if(i > 0)
                 {
-                    drawY += _lineHeight;            
+                    drawY += _lineHeight;
                 }
             }
                 break;
@@ -96,36 +101,39 @@ static const int kAlignmentBuffer = 5;
             {
                 if(i > 0)
                 {
-                    drawY += _lineHeight;            
+                    drawY += _lineHeight;
                 }
             }
                 break;
         }
         
         // calculate draw X based on textAlignmentment
-        int drawX = 0; 
-        
-        if (self.textAlignment == UITextAlignmentCenter) 
+        if (self.textAlignment == UITextAlignmentCenter)
         {
-            drawX = floorf((self.frame.size.width - [line sizeWithFont:self.font].width) / 2);
-        } 
-        else if (self.textAlignment == UITextAlignmentRight) 
+            _drawX = floorf((self.frame.size.width - [line sizeWithFont:self.font].width) / 2);
+        }
+        else if (self.textAlignment == UITextAlignmentRight)
         {
-            drawX = (self.frame.size.width - [line sizeWithFont:self.font].width);
+            _drawX = (self.frame.size.width - [line sizeWithFont:self.font].width);
         }
         
-        [line drawAtPoint:CGPointMake(drawX, drawY) forWidth:self.frame.size.width withFont:self.font fontSize:self.font.pointSize lineBreakMode:UILineBreakModeClip baselineAdjustment:UIBaselineAdjustmentNone];
+        if(_drawX < 0)
+        {
+            _drawX = 0;
+        }
+        
+        [line drawAtPoint:CGPointMake(_drawX, drawY) forWidth:self.frame.size.width withFont:self.font fontSize:self.font.pointSize lineBreakMode:UILineBreakModeClip baselineAdjustment:UIBaselineAdjustmentNone];
     }
 }
 
 
 #pragma mark - Properties
 
-- (void)setLineHeight:(int)lineHeight 
+- (void)setLineHeight:(int)lineHeight
 {
-    if (_lineHeight == lineHeight) 
-    { 
-        return; 
+    if (_lineHeight == lineHeight)
+    {
+        return;
     }
     
     _lineHeight = lineHeight;
@@ -137,57 +145,139 @@ static const int kAlignmentBuffer = 5;
 
 - (void)setup
 {
-    _lineHeight = 10;
+    _lineHeight = 12;
+    self.minimumFontSize = 12;
     _verticalAlignment = MSLabelVerticalAlignmentMiddle;
 }
 
-- (NSArray *)stringsFromText:(NSString *)string 
+- (NSArray *)stringsFromText:(NSString *)string
 {
-    NSMutableArray *stringsArray = [[[string componentsSeparatedByString:@" "] mutableCopy] autorelease];
+    NSMutableArray *characterArray = [self arrayOfCharactersInString:string];
     NSMutableArray *slicedString = [NSMutableArray array];
     
-    while (stringsArray.count != 0) 
+    while (characterArray.count != 0)
     {
         NSString *line = @"";
-        NSMutableIndexSet *wordsToRemove = [NSMutableIndexSet indexSet];
+        NSMutableIndexSet *charsToRemove = [NSMutableIndexSet indexSet];
         
-        for (int i = 0; i < [stringsArray count]; i++) 
+        for (int i = 0; i < [characterArray count]; i++)
         {
-            NSString *word = [stringsArray objectAtIndex:i];
+            NSString *character = [characterArray objectAtIndex:i];
+            CGFloat stringWidth = [[line stringByAppendingFormat:@"%@", character] sizeWithFont:self.font].width;
             
-            if ([[line stringByAppendingFormat:@"%@ ", word] sizeWithFont:self.font].width <= self.frame.size.width) 
+            // shrink font to fit text as best as we can
+            if(stringWidth > (self.frame.size.width - 10))
             {
-                line = [line stringByAppendingFormat:@"%@ ", word];
-                [wordsToRemove addIndex:i];
-            } 
-            else 
-            {
-                if (line.length == 0) 
+                CGFloat fontSize = self.font.pointSize;
+                
+                while(stringWidth > (self.frame.size.width - 10) && fontSize >= self.minimumFontSize)
                 {
-                    line = [line stringByAppendingFormat:@"%@ ", word];
-                    [wordsToRemove addIndex:i];
+                    self.font = [UIFont fontWithName:self.font.fontName size:fontSize--];
+                    _lineHeight = self.font.pointSize;
+                    stringWidth = [[line stringByAppendingFormat:@"%@", character] sizeWithFont:self.font].width;
                 }
+            }
+            
+            if (stringWidth <= (self.frame.size.width - 10))
+            {
+                line = [line stringByAppendingFormat:@"%@", character];
+                [charsToRemove addIndex:i];
+            }
+            else
+            {
+                if (line.length == 0)
+                {
+                    line = [line stringByAppendingFormat:@"%@", character];
+                    [charsToRemove addIndex:i];
+                }
+                
                 break;
             }
         }
         
-        [slicedString addObject:[line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]];
-        [stringsArray removeObjectsAtIndexes:wordsToRemove];
+        [slicedString addObject:line];
+        [characterArray removeObjectsAtIndexes:charsToRemove];
     }
     
-    if (slicedString.count > self.numberOfLines && self.numberOfLines != 0) 
+    slicedString = [self stringsWithWordsWrappedFromArray:slicedString];
+    
+    return slicedString;
+}
+
+- (NSMutableArray *)stringsWithWordsWrappedFromArray:(NSArray *)strings
+{
+    NSMutableArray *newStrings = [NSMutableArray arrayWithArray:strings];
+    
+    for (int i = 0; i < strings.count; i++)
     {
-        NSString *line = [slicedString objectAtIndex:(self.numberOfLines - 1)];
+        if(i != 0)
+        {
+            NSString *lastWord = [self lastWordInString:[strings objectAtIndex:i - 1]];
+            
+            // Fix word wrapping
+            if(lastWord.length > 0)
+            {
+                NSString *lastString = [newStrings objectAtIndex:i - 1];
+                NSString *updatedString = [lastString substringToIndex:lastString.length - (lastWord.length + 1)];
+                [newStrings replaceObjectAtIndex:i-1 withObject:updatedString];
+                
+                NSString *currentString = [newStrings objectAtIndex:i];
+                
+                currentString = [NSString stringWithFormat:@"%@%@",lastWord,currentString];
+                
+                [newStrings replaceObjectAtIndex:i withObject:currentString];
+            }
+        }
+        
+    }
+    
+    if (newStrings.count > self.numberOfLines && self.numberOfLines != 0)
+    {
+        NSString *line = [newStrings objectAtIndex:(self.numberOfLines - 1)];
         if ([line length] >= 3) {
             line = [line stringByReplacingCharactersInRange:NSMakeRange(line.length - 3, 3) withString:@"..."];
         } else {
             line = @"...";
         }
-        [slicedString removeObjectAtIndex:(self.numberOfLines - 1)];
-        [slicedString insertObject:line atIndex:(self.numberOfLines - 1)];
+        [newStrings removeObjectAtIndex:(self.numberOfLines - 1)];
+        [newStrings insertObject:line atIndex:(self.numberOfLines - 1)];
     }
     
-    return slicedString;
+    return newStrings;
+}
+
+- (NSString *)lastWordInString:(NSString *)string
+{
+    NSString *lastWord;
+    
+    // Check for whole words
+    NSArray *wordArray = [string componentsSeparatedByString:@" "];
+    
+    if(wordArray.count > 1)
+    {
+        lastWord = [wordArray lastObject];
+    }
+    else
+    {
+        lastWord = @"";
+    }
+    
+    return lastWord;
+}
+
+- (NSMutableArray *)arrayOfCharactersInString:(NSString *)string
+{
+    NSRange theRange = {0, 1};
+    
+    NSMutableArray *stringsArray  = [NSMutableArray array];
+    
+    for ( NSInteger i = 0; i < [string length]; i++)
+    {
+        theRange.location = i;
+        [stringsArray addObject:[string substringWithRange:theRange]];
+    }
+    
+    return stringsArray;
 }
 
 @end
